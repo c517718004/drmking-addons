@@ -112,41 +112,10 @@ abstract class Addons
         }
         // 文件属性
         $info = $this->info ?? [];
-        // 文件配置
-        $info_file = $this->addon_path . 'info.ini';
-        if (is_file($info_file)) {
-            $_info = parse_ini_file($info_file, true, INI_SCANNER_TYPED) ?: [];
-            $_info['url'] = addons_url();
-            $info = array_merge($_info, $info);
-        }
         Config::set($info, $this->addon_info);
         return isset($info) ? $info : [];
     }
-    /**
-     * 获取配置信息
-     * @param bool $type 是否获取完整配置
-     * @return array|mixed
-     */
-    final public function getConfig($type = false)
-    {
-        $config = Config::get($this->addon_config, []);
-        if ($config) {
-            return $config;
-        }
-        $config_file = $this->addon_path . 'config.php';
-        if (is_file($config_file)) {
-            $temp_arr = (array)include $config_file;
-            if ($type) {
-                return $temp_arr;
-            }
-            foreach ($temp_arr as $key => $value) {
-                $config[$key] = $value['value'];
-            }
-            unset($temp_arr);
-        }
-        Config::set($config, $this->addon_config);
-        return $config;
-    }
+
     //必须实现安装
     abstract public function install();
     //必须卸载插件方法

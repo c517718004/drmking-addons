@@ -1,20 +1,14 @@
 <?php
 declare(strict_types=1);
 namespace think\addons;
-use think\facade\Lang;
 use think\helper\Str;
 use think\facade\Event;
 use think\facade\Config;
 use think\exception\HttpException;
-use think\addons\AddonException;
-use think\validate\ValidateRule;
 class Route
 {
     /**
      * 插件路由请求
-     * @param null $addon
-     * @param null $controller
-     * @param null $action
      * @return mixed
      */
     public static $addonPath;
