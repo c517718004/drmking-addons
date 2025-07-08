@@ -354,7 +354,7 @@ class Service extends BaseService
     }
     public function boot()
     {
-        if (self::$isAddonApp || true) {
+        if (self::$isAddonApp) {
             $this->registerRoutes(function (Route $route) {
                 if (self::$addonPlugin !== false) {
                     $route->rule('addons/:addon/Plugin/[:action]', function () {
