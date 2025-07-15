@@ -1,4 +1,10 @@
 <?php
+/*
+ * @Author: 常立超
+ * @Date: 2025-07-06 08:51:21
+ * @LastEditors: 常立超
+ * @LastEditTime: 2025-07-11 16:44:05
+ */
 declare(strict_types=1);
 namespace think\addons;
 use think\helper\Str;
@@ -12,26 +18,23 @@ class Route
      * @return mixed
      */
     public static $addonPath;
-    public static $app;
+
     public static function execute()
     {
-        $app = app();
-        $request = $app->request;
-        $addon = $request->route('addon');
-        $module = $request->route('module') ?? 'index';
-        $controller = $request->route('controller');
-        $action = $request->route('action') ?? 'index';
-        self::$app = $app;
-        Event::trigger('addons_begin', $request);
+        $addon = app()->request->route('addon');
+        $module = app()->request->route('module') ?? 'index';
+        $controller = app()->request->route('controller');
+        $action = app()->request->route('action') ?? 'index';
+        Event::trigger('addons_begin', app()->request);
         if (empty($addon) || empty($controller) || empty($action)) {
             throw new HttpException(500, lang('addon can not be empty'));
         }
         self::$addonPath = Service::getAddonPath();
-        $request->addon = $addon;
+        app()->request->addon = $addon;
         // 设置当前请求的控制器、操作
-        $request->setController("{$module}.{$controller}")->setAction($action);
+        app()->request->setController("{$module}.{$controller}")->setAction($action);
         // 获取插件基础信息
-        $info = $app->addons->getAddonInfo();
+        $info = app()->addons->getAddonInfo();
         if (!$info) {
             throw new HttpException(404, lang('addon %s not found', [$addon]));
         }
@@ -39,14 +42,14 @@ class Route
             throw new HttpException(500, lang('addon %s is disabled', [$addon]));
         }
         // 监听addon_module_init
-        Event::trigger('addon_module_init', $request);
-        $class = $app->addons->getAddonsControllerClass($controller);
+        Event::trigger('addon_module_init', app()->request);
+        $class = app()->addons->getAddonsControllerClass($controller);
         if (!$class) {
             throw new HttpException(404, lang('addon controller %s not found', [Str::studly($module . DIRECTORY_SEPARATOR . $controller)]));
         }
         // 重写视图基础路径
         $config = Config::get('view');
-        $config['view_path'] = $app->addons->getAddonsPath() . $addon . DIRECTORY_SEPARATOR . $module . DIRECTORY_SEPARATOR . 'view' . DIRECTORY_SEPARATOR;
+        $config['view_path'] = app()->addons->getAddonsPath() . $addon . DIRECTORY_SEPARATOR . $module . DIRECTORY_SEPARATOR . 'view' . DIRECTORY_SEPARATOR;
         Config::set($config, 'view');
         if (is_file(self::$addonPath . 'app.php')) {
             $addonAppConfig = (require_once(self::$addonPath . 'app.php'));
@@ -57,7 +60,7 @@ class Route
         }
         // 生成控制器对象
         try {
-            $instance = new $class($app);
+            $instance = new $class(app());
         } catch (\Exception $e) {
             throw new HttpException(404, lang('addon controller %s not found', [Str::studly($controller)]));
         }

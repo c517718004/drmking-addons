@@ -3,7 +3,7 @@
  * @Author: 常立超
  * @Date: 2025-07-03 21:15:26
  * @LastEditors: 常立超
- * @LastEditTime: 2025-07-05 16:13:43
+ * @LastEditTime: 2025-07-15 10:36:26
  */
 /*
  * @Author: 常立超
@@ -44,6 +44,9 @@ class Service extends BaseService
     // 插件Plugin路由
 
     protected static $addonPlugin = false;
+
+    protected static $controller;
+    protected static $action;
 
     /**
      * 获取当前运行入口名称
@@ -94,24 +97,48 @@ class Service extends BaseService
                         return true;
                     }
                 } else {
+                    $flag = false;
                     // 单应用
                     if (self::isApp()) {
                         self::setMultiApp(false);
                         if (isset($pathinfo_arr[2])) {
-                            $class = self::getAddonsControllerClass($pathinfo_arr[2]);
-                            if (!empty($class)) {
-                                return true;
+                            self::setController($pathinfo_arr[2]);
+                            if (isset($pathinfo_arr[3]) && !empty($pathinfo_arr[3])) {
+                                self::setAction($pathinfo_arr[3]);
+                                $flag = true;
                             }
                         }
                     } else {
                         self::setMultiApp(true);
                         if (isset($pathinfo_arr[2]) && isset($pathinfo_arr[3]) && self::isApp($pathinfo_arr[2])) {
                             self::setAppName($pathinfo_arr[2]);
-                            $class = self::getAddonsControllerClass($pathinfo_arr[3]);
-                            if (!empty($class)) {
-                                return true;
+                            self::setController($pathinfo_arr[3]);
+                            if (isset($pathinfo_arr[4]) && !empty($pathinfo_arr[4])) {
+                                self::setAction($pathinfo_arr[4]);
+                                $flag = true;
                             }
                         }
+                    }
+                    // 生成控制器对象
+                    try {
+                        if ($flag) {
+                            $class = self::getAddonsControllerClass(self::getController());
+                            if (empty($class)) {
+                                throw new HttpException(404, lang('addon controller %s not found', [self::getController()]));
+                            }
+                            $action = self::getAction();
+                            $instance = new $class(app());
+                            if (is_callable([$instance, $action])) {
+                                return true;
+                            } else {
+                                // 操作不存在
+                                throw new HttpException(404, lang('addon action %s not found', [get_class($instance) . '->' . $action . '()']));
+                            }
+                        } else {
+                            return false;
+                        }
+                    } catch (\Exception $e) {
+                        return false;
                     }
                 }
             }
@@ -125,9 +152,14 @@ class Service extends BaseService
      * @param string $class 当前类名
      * @return string
      */
-    public static function getAddonsControllerClass($class_name)
+    public static function getAddonsControllerClass($class_name = '')
     {
-        $class_name = trim($class_name);
+        if (is_string($class_name)) {
+            $class_name = trim($class_name);
+        }
+        if (empty($class_name)) {
+            $class_name = self::getController();
+        }
         // 处理多级控制器情况
         if (!empty($class_name) && strpos($class_name, '.')) {
             $class_name = explode('.', $class_name);
@@ -294,6 +326,42 @@ class Service extends BaseService
     {
         return self::$addonName;
     }
+    /**
+     * 设置控制器名字
+     * @param mixed $controller
+     * @return void
+     */
+    public static function setController($controller): void
+    {
+        self::$controller = $controller;
+    }
+
+    /**
+     * 获取控制器名字
+     */
+    public static function getController()
+    {
+        return self::$controller;
+    }
+
+    /**
+     * 设置方法名字
+     * @param mixed $action
+     * @return void
+     */
+    public static function setAction($action = 'index'): void
+    {
+        self::$action = $action;
+    }
+
+    /**
+     * 获取方法名字
+     */
+    public static function getAction()
+    {
+        return self::$action;
+    }
+
     public static function getAddonInfo()
     {
         $addon_list = self::getAddonList();
