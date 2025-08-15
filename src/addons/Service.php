@@ -3,13 +3,7 @@
  * @Author: 常立超
  * @Date: 2025-07-03 21:15:26
  * @LastEditors: 常立超
- * @LastEditTime: 2025-07-15 10:36:26
- */
-/*
- * @Author: 常立超
- * @Date: 2025-07-01 11:53:20
- * @LastEditors: 常立超
- * @LastEditTime: 2025-07-04 11:39:42
+ * @LastEditTime: 2025-08-15 15:55:20
  */
 declare(strict_types=1);
 namespace think\addons;
@@ -21,6 +15,7 @@ use think\facade\Event;
 use think\helper\Str;
 use think\Service as BaseService;
 use think\addons\middleware\Addons;
+
 /**
  * 插件服务
  * Class Service
@@ -72,6 +67,14 @@ class Service extends BaseService
             $pathInfo = preg_replace('/^' . preg_quote(dirname($scriptName), '/') . '/', '', $requestUri, 1);
         }
         return trim($pathInfo, '/') ?? '';
+    }
+    /**
+     * 判断是否命令行模式
+     * @return int
+     */
+    public static function is_cli()
+    {
+        return preg_match("/cli/i", php_sapi_name()) ? 1 : 0;
     }
     /**
      * 设置插件的名称
@@ -402,7 +405,25 @@ class Service extends BaseService
 
     public function register()
     {
-        if (self::init()) {
+        if (self::is_cli()) {
+            self::setAddonsPath();
+            if ($_SERVER['argc'] == 1 && $_SERVER['argv'][0] == 'think') {
+                // 加载所有命令
+                $this->loadCommand();
+                return true;
+            } elseif ($_SERVER['argc'] == 2 && $_SERVER['argv'][0] == 'think') {
+                // 执行命令
+                //加载语言
+                $this->loadLang();
+                // 加载插件系统服务
+                $this->loadService();
+                // 加载插件命令
+                $this->loadCommand();
+                return true;
+            } else {
+                return true;
+            }
+        } else if (self::init()) {
             //加载语言
             $this->loadLang();
             //挂载插件的自定义路由
@@ -561,11 +582,17 @@ class Service extends BaseService
             if (!is_dir($module_dir)) {
                 continue;
             }
-            $command_file = $module_dir . 'command.php';
+            $command_file = $module_dir . '/config/console.php';
             if (is_file($command_file)) {
                 $commands = include_once $command_file;
-                if (is_array($commands)) {
-                    $this->commands($commands);
+                if (!empty($commands)) {
+                    if (is_array($commands)) {
+                        if (isset($commands['commands'])) {
+                            $this->commands($commands['commands']);
+                        } else {
+                            $this->commands($commands);
+                        }
+                    }
                 }
             }
         }
