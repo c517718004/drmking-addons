@@ -3,14 +3,18 @@
  * @Author: 常立超
  * @Date: 2025-07-03 21:15:26
  * @LastEditors: 常立超
- * @LastEditTime: 2025-07-04 15:19:39
+ * @LastEditTime: 2025-09-14 10:39:42
  */
 declare(strict_types=1);
 
 // 插件类库自动载入
 spl_autoload_register(function ($class) {
     $class = ltrim($class, '\\');
-    $dir = app()->getRootPath();
+    if (function_exists('app')) {
+        $dir = app()->getRootPath();
+    } else {
+        $dir = dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/';
+    }
     $namespace = 'addons';
     if (strpos($class, $namespace) === 0) {
         $class = substr($class, strlen($namespace));
