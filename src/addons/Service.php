@@ -3,7 +3,7 @@
  * @Author: 常立超
  * @Date: 2025-07-03 21:15:26
  * @LastEditors: 常立超
- * @LastEditTime: 2025-08-15 15:55:20
+ * @LastEditTime: 2025-09-14 15:46:43
  */
 declare(strict_types=1);
 namespace think\addons;
@@ -80,6 +80,91 @@ class Service extends BaseService
      * 设置插件的名称
      * @return bool
      */
+    // public static function init(): bool
+    // {
+    //     $pathinfo = self::getPathInfo();
+    //     if (str_starts_with($pathinfo, 'addons/')) {
+    //         self::setAddonsPath();
+    //         $pathinfo_arr = explode('/', $pathinfo);
+    //         $addon_list = self::getAddonList();
+    //         if (isset($pathinfo_arr[1]) && array_key_exists($pathinfo_arr[1], $addon_list)) {
+    //             self::setIsAddonApp(true);
+    //             self::setAddonName($pathinfo_arr[1]);
+    //             self::setAddonPath();
+    //             if (isset($pathinfo_arr[1]) && strtolower($pathinfo_arr[2]) == 'plugin') {
+    //                 $class = self::getAddonsPluginClass(self::getAddonName());
+    //                 $methods = get_class_methods(new $class(app()));
+    //                 $methods = array_merge($methods, ['init', 'initialize', 'install', 'uninstall', 'enabled', 'disabled']);
+    //                 if (isset($pathinfo_arr[3]) && in_array($pathinfo_arr[3], $methods)) {
+    //                     self::$addonPlugin = [$class, $pathinfo_arr[3]];
+    //                     return true;
+    //                 }
+    //             } else {
+    //                 $flag = false;
+    //                 // 单应用
+    //                 if (self::isApp()) {
+    //                     self::setMultiApp(false);
+    //                     if (isset($pathinfo_arr[2])) {
+    //                         self::setController($pathinfo_arr[2]);
+    //                         if (isset($pathinfo_arr[3]) && !empty($pathinfo_arr[3])) {
+    //                             self::setAction($pathinfo_arr[3]);
+    //                             $flag = true;
+    //                         }
+    //                     }
+    //                 } else {
+    //                     self::setMultiApp(true);
+    //                     if (isset($pathinfo_arr[2]) && isset($pathinfo_arr[3]) && self::isApp($pathinfo_arr[2])) {
+    //                         self::setAppName($pathinfo_arr[2]);
+    //                         self::setController($pathinfo_arr[3]);
+    //                         if (isset($pathinfo_arr[4]) && !empty($pathinfo_arr[4])) {
+    //                             self::setAction($pathinfo_arr[4]);
+    //                             $flag = true;
+    //                         }
+    //                     }
+    //                 }
+    //                 // 生成控制器对象
+    //                 try {
+    //                     if ($flag) {
+    //                         $class = self::getAddonsControllerClass(self::getController());
+    //                         if (empty($class)) {
+    //                             throw new HttpException(404, lang('addon controller %s not found', [self::getController()]));
+    //                         }
+    //                         $action = self::getAction();
+    //                         $instance = new $class(app());
+    //                         if (is_callable([$instance, $action])) {
+    //                             return true;
+    //                         } else {
+    //                             // 操作不存在
+    //                             throw new HttpException(404, lang('addon action %s not found', [get_class($instance) . '->' . $action . '()']));
+    //                         }
+    //                     } else {
+    //                         return false;
+    //                     }
+    //                 } catch (\Exception $e) {
+    //                     return false;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     return false;
+    // }
+    /**
+     * 判断是否应用目录
+     * @param mixed $app_name
+     * @return bool
+     */
+    public static function isApp($app_name = '')
+    {
+        if (empty($app_name)) {
+            $controller_path = self::getAddonPath() . 'controller';
+            self::setMultiApp(false);
+        } else {
+            $controller_path = self::getAddonPath() . $app_name . DIRECTORY_SEPARATOR . 'controller';
+            self::setMultiApp(true);
+        }
+        return is_dir($controller_path);
+    }
+
     public static function init(): bool
     {
         $pathinfo = self::getPathInfo();
@@ -103,7 +188,6 @@ class Service extends BaseService
                     $flag = false;
                     // 单应用
                     if (self::isApp()) {
-                        self::setMultiApp(false);
                         if (isset($pathinfo_arr[2])) {
                             self::setController($pathinfo_arr[2]);
                             if (isset($pathinfo_arr[3]) && !empty($pathinfo_arr[3])) {
@@ -112,7 +196,6 @@ class Service extends BaseService
                             }
                         }
                     } else {
-                        self::setMultiApp(true);
                         if (isset($pathinfo_arr[2]) && isset($pathinfo_arr[3]) && self::isApp($pathinfo_arr[2])) {
                             self::setAppName($pathinfo_arr[2]);
                             self::setController($pathinfo_arr[3]);
@@ -201,20 +284,7 @@ class Service extends BaseService
         $namespace = '\\' . implode('\\', $paths);
         return class_exists($namespace) ? $namespace : '';
     }
-    /**
-     * 判断是否应用目录
-     * @param mixed $app_name
-     * @return bool
-     */
-    public static function isApp($app_name = '')
-    {
-        if (empty($app_name)) {
-            $controller_path = self::getAddonPath() . 'controller';
-        } else {
-            $controller_path = self::getAddonPath() . $app_name . DIRECTORY_SEPARATOR . 'controller';
-        }
-        return is_dir($controller_path);
-    }
+
     /**
      * 设置 是否插件应用
      * @return void
@@ -402,16 +472,87 @@ class Service extends BaseService
         }
         return empty($addon_list) ? [] : $addon_list;
     }
+    /**
+     * 初始化cli模式下的环境
+     * @return bool
+     */
+    public function initCli()
+    {
+        $command = $_SERVER['argv'][1];
+        if (\think\facade\Console::hasCommand($command)) {
+            $commandClass = \think\facade\Console::getCommand($command);
+            $pathinfo = str_replace('\\', '/', $commandClass::class);
+            if (str_starts_with($pathinfo, 'addons/')) {
+                $pathinfo_arr = explode('/', $pathinfo);
+                $addon_list = self::getAddonList();
+                if (isset($pathinfo_arr[1]) && array_key_exists($pathinfo_arr[1], $addon_list)) {
+                    self::setIsAddonApp(true);
+                    self::setAddonName($pathinfo_arr[1]);
+                    self::setAddonPath();
+                    self::isApp();
+                    $this->loadAddonConfig();
+                }
+            }
+        }
+        return false;
+    }
+    /**
+     * 加载插件全局配置
+     * @return void
+     */
+    public function loadAddonConfig()
+    {
+        // 加载配置文件夹
+        $commands = [];
+        //配置文件
+        $addon_config_dir = self::getAddonPath() . 'config' . DIRECTORY_SEPARATOR;
+        if (is_dir($addon_config_dir)) {
+            $files = [];
+            $files = array_merge($files, glob($addon_config_dir . '*' . $this->app->getConfigExt()));
+            if ($files) {
+                foreach ($files as $file) {
+                    if (file_exists($file)) {
+                        if (substr($file, -11) == 'console.php') {
+                            $commands_config = include_once $file;
+                            if (isset($commands_config['commands'])) {
+                                $commands = array_merge($commands, $commands_config['commands']);
+                            }
+                            if (!empty($commands)) {
+                                \think\Console::starting(function (\think\Console $console) use ($commands) {
+                                    $console->addCommands($commands);
+                                });
+                            }
+                        } else {
+                            $this->app->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+                        }
+                    }
+                }
+            }
+        }
+        // 加载语言文件
+        $addon_lang_dir = self::getAddonPath() . 'lang' . DIRECTORY_SEPARATOR;
+        if (is_dir($addon_lang_dir)) {
+            $files = glob($addon_lang_dir . $this->app->lang->defaultLangSet() . '.php');
+            foreach ($files as $file) {
+                if (file_exists($file)) {
+                    Lang::load([$file]);
+                }
+            }
+        }
+    }
 
     public function register()
     {
+        echo 'register';
         if (self::is_cli()) {
             self::setAddonsPath();
             if ($_SERVER['argc'] == 1 && $_SERVER['argv'][0] == 'think') {
                 // 加载所有命令
                 $this->loadCommand();
+                $this->setIsAddonApp(false);
                 return true;
-            } elseif ($_SERVER['argc'] == 2 && $_SERVER['argv'][0] == 'think') {
+            } elseif ($_SERVER['argc'] >= 2 && $_SERVER['argv'][0] == 'think') {
+                print_r($_SERVER['argv']);
                 // 执行命令
                 //加载语言
                 $this->loadLang();
@@ -419,6 +560,8 @@ class Service extends BaseService
                 $this->loadService();
                 // 加载插件命令
                 $this->loadCommand();
+                //加载配置
+                $this->initCli();
                 return true;
             } else {
                 return true;
@@ -441,31 +584,77 @@ class Service extends BaseService
             $this->app->bind('addons', Service::class);
         }
     }
+    // public function register()
+    // {
+    //     echo 'register';
+    //     if (self::is_cli()) {
+    //         self::setAddonsPath();
+    //         if ($_SERVER['argc'] == 1 && $_SERVER['argv'][0] == 'think') {
+    //             // 加载所有命令
+    //             $this->loadCommand();
+    //             return true;
+    //         } elseif ($_SERVER['argc'] == 2 && $_SERVER['argv'][0] == 'think') {
+    //             // 执行命令
+    //             //加载语言
+    //             $this->loadLang();
+    //             // 加载插件系统服务
+    //             $this->loadService();
+    //             // 加载插件命令
+    //             $this->loadCommand();
+    //             //加载配置
+    //             // $this->loadApp();
+    //             // $this->setApp();
+    //             return true;
+    //         } else {
+    //             return true;
+    //         }
+    //     } else if (self::init()) {
+    //         //加载语言
+    //         $this->loadLang();
+    //         //挂载插件的自定义路由
+    //         $this->loadRoutes();
+    //         // 加载插件事件
+    //         $this->loadEvent();
+    //         // 加载插件系统服务
+    //         $this->loadService();
+    //         // 加载插件命令
+    //         $this->loadCommand();
+    //         //加载配置
+    //         // $this->loadApp();
+    //         $this->setApp();
+    //         // 绑定插件容器
+    //         $this->app->bind('addons', Service::class);
+    //     }
+    // }
     public function boot()
     {
-        if (self::$isAddonApp) {
-            $this->registerRoutes(function (Route $route) {
-                if (self::$addonPlugin !== false) {
-                    $route->rule('addons/:addon/Plugin/[:action]', function () {
-                        $request = $this->app->request;
-                        $addon = $request->route('addon') ?? '';
-                        $action = $request->route('action') ?? 'index';
-                        return $this->executePlugin($addon, $action);
-                    });
-                    $route->rule('addons/:addon/plugin/[:action]', function () {
-                        $request = $this->app->request;
-                        $addon = $request->route('addon') ?? '';
-                        $action = $request->route('action') ?? 'index';
-                        return $this->executePlugin($addon, $action);
-                    });
-                } else {
-                    // 路由脚本
-                    $execute = '\\think\\addons\\Route::execute';
-                    // 注册控制器路由
-                    $route->rule('addons/:addon/[:module]/[:controller]/[:action]', $execute)
-                        ->middleware(Addons::class);
-                }
-            });
+        if (self::is_cli()) {
+
+        } else {
+            if (self::getIsAddonApp()) {
+                $this->registerRoutes(function (Route $route) {
+                    if (self::$addonPlugin !== false) {
+                        $route->rule('addons/:addon/Plugin/[:action]', function () {
+                            $request = $this->app->request;
+                            $addon = $request->route('addon') ?? '';
+                            $action = $request->route('action') ?? 'index';
+                            return $this->executePlugin($addon, $action);
+                        });
+                        $route->rule('addons/:addon/plugin/[:action]', function () {
+                            $request = $this->app->request;
+                            $addon = $request->route('addon') ?? '';
+                            $action = $request->route('action') ?? 'index';
+                            return $this->executePlugin($addon, $action);
+                        });
+                    } else {
+                        // 路由脚本
+                        $execute = '\\think\\addons\\Route::execute';
+                        // 注册控制器路由
+                        $route->rule('addons/:addon/[:module]/[:controller]/[:action]', $execute)
+                            ->middleware(Addons::class);
+                    }
+                });
+            }
         }
     }
 
@@ -628,8 +817,174 @@ class Service extends BaseService
     /**
      * 加载配置，路由，语言，中间件等
      */
+    // protected function loadApp()
+    // {
+    //     $results = scandir(self::getAddonPath());
+    //     foreach ($results as $childname) {
+    //         if (in_array($childname, ['.', '..', 'public', 'view'])) {
+    //             continue;
+    //         }
+    //         if (in_array($childname, ['vendor'])) {
+    //             $autoload_file = self::getAddonPath() . $childname . DIRECTORY_SEPARATOR . 'autoload.php';
+    //             if (file_exists($autoload_file)) {
+    //                 require_once $autoload_file;
+    //             }
+    //         }
+    //         // 中间件
+    //         if (is_file(self::getAddonPath() . 'middleware.php')) {
+    //             $this->app->middleware->import(include self::getAddonPath() . 'middleware.php', 'app');
+    //         }
+    //         if (is_file(self::getAddonPath() . 'common.php')) {
+    //             include_once self::getAddonPath() . 'common.php';
+    //         }
+    //         if (is_file(self::getAddonPath() . 'provider.php')) {
+    //             $this->app->bind(include self::getAddonPath() . 'provider.php');
+    //         }
+    //         //事件
+    //         if (is_file(self::getAddonPath() . 'event.php')) {
+    //             $this->app->loadEvent(include self::getAddonPath() . 'event.php');
+    //         }
+    //         if (self::getMultiApp()) {
+    //             $module_dir = self::getAddonPath() . self::getAppName() . DIRECTORY_SEPARATOR;
+    //             if (is_dir($module_dir)) {
+    //                 foreach (scandir($module_dir) as $mdir) {
+    //                     if (in_array($mdir, ['.', '..'])) {
+    //                         continue;
+    //                     }
+    //                     if (is_file($module_dir . 'middleware.php')) {
+    //                         $this->app->middleware->import(include $module_dir . 'middleware.php', 'app');
+    //                     }
+    //                     if (is_file($module_dir . 'common.php')) {
+    //                         include_once $module_dir . 'common.php';
+    //                     }
+    //                     if (is_file($module_dir . 'provider.php')) {
+    //                         $this->app->bind(include $module_dir . 'provider.php');
+    //                     }
+    //                     //事件
+    //                     if (is_file($module_dir . 'event.php')) {
+    //                         $this->app->loadEvent(include $module_dir . 'event.php');
+    //                     }
+    //                     $commands = [];
+    //                     //配置文件
+    //                     $app_config_dir = $module_dir . 'config' . DIRECTORY_SEPARATOR;
+    //                     if (is_dir($app_config_dir)) {
+    //                         $files = [];
+    //                         $files = array_merge($files, glob($app_config_dir . '*' . $this->app->getConfigExt()));
+    //                         if ($files) {
+    //                             foreach ($files as $file) {
+    //                                 if (file_exists($file)) {
+    //                                     if (substr($file, -11) == 'console.php') {
+    //                                         $commands_config = include_once $file;
+    //                                         if (isset($commands_config['commands'])) {
+    //                                             $commands = array_merge($commands, $commands_config['commands']);
+    //                                         }
+    //                                         if (!empty($commands)) {
+    //                                             \think\Console::starting(function (\think\Console $console) use ($commands) {
+    //                                                 $console->addCommands($commands);
+    //                                             });
+    //                                         }
+    //                                     } else {
+    //                                         $this->app->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+    //                                     }
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                     //语言文件
+    //                     $app_lang_dir = $module_dir . 'lang' . DIRECTORY_SEPARATOR;
+    //                     if (is_dir($app_lang_dir)) {
+    //                         $files = glob($app_lang_dir . $this->app->lang->defaultLangSet() . '.php');
+    //                         foreach ($files as $file) {
+    //                             if (file_exists($file)) {
+    //                                 Lang::load([$file]);
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         } else {
+    //             $module_dir = self::getAddonPath();
+    //             $commands = [];
+    //             //配置文件
+    //             $app_config_dir = $module_dir . 'config' . DIRECTORY_SEPARATOR;
+    //             if (is_dir($app_config_dir)) {
+    //                 $files = [];
+    //                 $files = array_merge($files, glob($app_config_dir . '*' . $this->app->getConfigExt()));
+    //                 if ($files) {
+    //                     foreach ($files as $file) {
+    //                         if (file_exists($file)) {
+    //                             if (substr($file, -11) == 'console.php') {
+    //                                 $commands_config = include_once $file;
+    //                                 if (isset($commands_config['commands'])) {
+    //                                     $commands = array_merge($commands, $commands_config['commands']);
+    //                                 }
+    //                                 if (!empty($commands)) {
+    //                                     \think\Console::starting(function (\think\Console $console) use ($commands) {
+    //                                         $console->addCommands($commands);
+    //                                     });
+    //                                 }
+    //                             } else {
+    //                                 $this->app->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //             //语言文件
+    //             $app_lang_dir = self::getAddonPath() . $childname . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR;
+    //             if (is_dir($app_lang_dir)) {
+    //                 $files = glob($app_lang_dir . $this->app->lang->defaultLangSet() . '.php');
+    //                 foreach ($files as $file) {
+    //                     if (file_exists($file)) {
+    //                         Lang::load([$file]);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
     protected function loadApp()
     {
+        // // 加载配置文件夹
+        // $commands = [];
+        // //配置文件
+        // $addon_config_dir = self::getAddonPath() . 'config' . DIRECTORY_SEPARATOR;
+        // if (is_dir($addon_config_dir)) {
+        //     $files = [];
+        //     $files = array_merge($files, glob($addon_config_dir . '*' . $this->app->getConfigExt()));
+        //     if ($files) {
+        //         foreach ($files as $file) {
+        //             if (file_exists($file)) {
+        //                 if (substr($file, -11) == 'console.php') {
+        //                     $commands_config = include_once $file;
+        //                     if (isset($commands_config['commands'])) {
+        //                         $commands = array_merge($commands, $commands_config['commands']);
+        //                     }
+        //                     if (!empty($commands)) {
+        //                         \think\Console::starting(function (\think\Console $console) use ($commands) {
+        //                             $console->addCommands($commands);
+        //                         });
+        //                     }
+        //                 } else {
+        //                     $this->app->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // // 加载语言文件
+        // $addon_lang_dir = self::getAddonPath() . 'lang' . DIRECTORY_SEPARATOR;
+        // if (is_dir($addon_lang_dir)) {
+        //     $files = glob($addon_lang_dir . $this->app->lang->defaultLangSet() . '.php');
+        //     foreach ($files as $file) {
+        //         if (file_exists($file)) {
+        //             Lang::load([$file]);
+        //         }
+        //     }
+        // }
+        $this->loadAddonConfig();
+
         $results = scandir(self::getAddonPath());
         foreach ($results as $childname) {
             if (in_array($childname, ['.', '..', 'public', 'view'])) {
@@ -655,6 +1010,7 @@ class Service extends BaseService
             if (is_file(self::getAddonPath() . 'event.php')) {
                 $this->app->loadEvent(include self::getAddonPath() . 'event.php');
             }
+
             if (self::getMultiApp()) {
                 $module_dir = self::getAddonPath() . self::getAppName() . DIRECTORY_SEPARATOR;
                 if (is_dir($module_dir)) {
@@ -710,44 +1066,6 @@ class Service extends BaseService
                                     Lang::load([$file]);
                                 }
                             }
-                        }
-                    }
-                }
-            } else {
-                $module_dir = self::getAddonPath();
-                $commands = [];
-                //配置文件
-                $app_config_dir = $module_dir . 'config' . DIRECTORY_SEPARATOR;
-                if (is_dir($app_config_dir)) {
-                    $files = [];
-                    $files = array_merge($files, glob($app_config_dir . '*' . $this->app->getConfigExt()));
-                    if ($files) {
-                        foreach ($files as $file) {
-                            if (file_exists($file)) {
-                                if (substr($file, -11) == 'console.php') {
-                                    $commands_config = include_once $file;
-                                    if (isset($commands_config['commands'])) {
-                                        $commands = array_merge($commands, $commands_config['commands']);
-                                    }
-                                    if (!empty($commands)) {
-                                        \think\Console::starting(function (\think\Console $console) use ($commands) {
-                                            $console->addCommands($commands);
-                                        });
-                                    }
-                                } else {
-                                    $this->app->config->load($file, pathinfo($file, PATHINFO_FILENAME));
-                                }
-                            }
-                        }
-                    }
-                }
-                //语言文件
-                $app_lang_dir = self::getAddonPath() . $childname . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR;
-                if (is_dir($app_lang_dir)) {
-                    $files = glob($app_lang_dir . $this->app->lang->defaultLangSet() . '.php');
-                    foreach ($files as $file) {
-                        if (file_exists($file)) {
-                            Lang::load([$file]);
                         }
                     }
                 }
