@@ -543,7 +543,6 @@ class Service extends BaseService
 
     public function register()
     {
-        echo 'register';
         if (self::is_cli()) {
             self::setAddonsPath();
             if ($_SERVER['argc'] == 1 && $_SERVER['argv'][0] == 'think') {
@@ -578,7 +577,6 @@ class Service extends BaseService
             // 加载插件命令
             $this->loadCommand();
             //加载配置
-            // $this->loadApp();
             $this->setApp();
             // 绑定插件容器
             $this->app->bind('addons', Service::class);
